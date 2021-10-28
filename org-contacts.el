@@ -1,4 +1,4 @@
-;;; org-contacts.el --- Contacts management
+;;; org-contacts.el --- Contacts management  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2010-2014 Julien Danjou <julien@danjou.info>
 
@@ -247,16 +247,16 @@ A regexp matching strings of whitespace, `,' and `;'.")
 		   (org-contacts-files))
       (org-contacts-db-has-dead-markers-p org-contacts-db)))
 
-(defun org-contacts-db-has-dead-markers-p (org-contacts-db)
-  "Returns t if at least one dead marker is found in
-ORG-CONTACTS-DB. A dead marker in this case is a marker pointing
-to dead or no buffer."
+(defun org-contacts-db-has-dead-markers-p (db)
+  "Return t if at least one dead marker is found in DB.
+A dead marker in this case is a marker pointing to dead or no
+buffer."
     ;; Scan contacts list looking for dead markers, and return t at first found.
     (catch 'dead-marker-found
-      (while org-contacts-db
-        (unless (marker-buffer (nth 1 (car org-contacts-db)))
+      (while db
+        (unless (marker-buffer (nth 1 (car db)))
           (throw 'dead-marker-found t))
-        (setq org-contacts-db (cdr org-contacts-db)))
+        (setq db (cdr db)))
       nil))
 
 (defun org-contacts-db ()
@@ -460,9 +460,7 @@ prefixes rather than just the beginning of the string."
 	    ((eq flag 'lambda)
 	     (org-contacts-test-completion-prefix string collection predicate))
 	    ((and (listp flag) (eq (car flag) 'boundaries))
-	     (cl-destructuring-bind (to-ignore &rest suffix)
-		 flag
-	       (org-contacts-boundaries-prefix string collection predicate suffix)))
+	     (org-contacts-boundaries-prefix string collection predicate (cdr flag)))
 	    ((eq flag 'metadata)
 	     (org-contacts-metadata-prefix string collection predicate))
 	    (t nil			; operation unsupported
@@ -569,16 +567,15 @@ description."
 								       (cdr (assoc-string org-contacts-email-property
 											  (cl-caddr contact)))
 								       ""))) ""))
-		       for tags = (cdr (assoc "TAGS" (nth 2 contact)))
-		       for tags-list = (if tags
-					   (split-string (substring (cdr (assoc "TAGS" (nth 2 contact))) 1 -1) ":")
-					 '())
+		       ;; for tags = (cdr (assoc "TAGS" (nth 2 contact)))
+		       ;; for tags-list = (if tags
+			   ;;  	   (split-string (substring (cdr (assoc "TAGS" (nth 2 contact))) 1 -1) ":")
+			   ;;  	 '())
 		       for marker = (nth 1 contact)
 		       if (with-current-buffer (marker-buffer marker)
 			    (save-excursion
 			      (goto-char marker)
-			      (let (todo-only)
-				(eval (cdr (org-make-tags-matcher (cl-subseq string 1)))))))
+				(eval (cdr (org-make-tags-matcher (cl-subseq string 1))))))
 		       collect (org-contacts-format-email contact-name email))
 	      ",")))
 	(when (not (string= "" result))
@@ -687,8 +684,7 @@ Format is a string matching the following format specification:
   %l - Link to the heading
   %y - Number of year
   %Y - Number of year (ordinal)"
-  (let ((calendar-date-style 'american)
-        (entry ""))
+  (let ((calendar-date-style 'american))
     (unless format (setq format org-contacts-birthday-format))
     (cl-loop for contact in (org-contacts-filter)
 	     for anniv = (let ((anniv (cdr (assoc-string
@@ -912,8 +908,7 @@ address."
                  (create-image image-data)))))
     ;; Next, try Gravatar
     (when org-contacts-icon-use-gravatar
-      (let* ((gravatar-size org-contacts-icon-size)
-             (email-list (org-entry-get pom org-contacts-email-property))
+      (let* ((email-list (org-entry-get pom org-contacts-email-property))
              (gravatar
               (when email-list
                 (cl-loop for email in (org-contacts-split-property email-list)
@@ -1166,10 +1161,9 @@ are effectively trimmed).  If nil, all zero-length substrings are retained."
 	 :type "org-contact"
 	 :link headline-str
 	 :description headline-str)
-        (setq desc headline-str)
-        (setq link (concat "org-contact:" headline-str))
-        (org-add-link-props :link link :description desc)
-        link))))
+    (let ((link (concat "org-contact:" headline-str)))
+      (org-link-add-props :link link :description headline-str)
+      link)))))
 
 (defun org-contacts--all-contacts ()
   "Return an alist (name . (file . position)) of all contacts in `org-contacts-files'."
